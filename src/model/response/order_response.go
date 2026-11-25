@@ -30,6 +30,24 @@ type OrderNotifyResponse struct {
 	Status int `json:"status" enums:"1,2,3" example:"2"`
 }
 
+// EPayQueryOrderResponse EPay 兼容查单（api.php?act=order）成功响应，字段均为顶层字段
+type EPayQueryOrderResponse struct {
+	Code        int    `json:"code" example:"1"`                                                                       // 查询成功固定为 1
+	Msg         string `json:"msg" example:"success"`                                                                  // 结果说明
+	PID         string `json:"pid" example:"1000"`                                                                     // 已认证商户 PID
+	OutTradeNo  string `json:"out_trade_no" example:"ORD20260416001"`                                                  // 商户订单号
+	TradeNo     string `json:"trade_no" example:"3nQ9pL2xV7sK1mR8cT4yB_aZ"`                                            // 平台订单号，与成功回调 trade_no 一致
+	Money       string `json:"money" example:"100.0000"`                                                               // 商户法币订单金额，保留4位小数
+	Status      int    `json:"status" enums:"0,1" example:"1"`                                                         // 1=已支付 0=尚未确认为已支付
+	TradeStatus string `json:"trade_status" enums:"TRADE_SUCCESS,WAIT_BUYER_PAY,TRADE_CLOSED" example:"TRADE_SUCCESS"` // 交易状态
+}
+
+// EPayQueryErrorResponse EPay 兼容查单失败响应
+type EPayQueryErrorResponse struct {
+	Code int    `json:"code" example:"-1"`                   // 失败固定为 -1
+	Msg  string `json:"msg" example:"authentication failed"` // 失败原因
+}
+
 // OrderNotifyResponseEpay epay订单异步回调结构体
 type OrderNotifyResponseEpay struct {
 	PID         int    `json:"pid" example:"1001"`                          // 商户ID

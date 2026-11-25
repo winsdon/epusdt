@@ -114,6 +114,19 @@ func GetOrderInfoByOrderId(orderId string) (*mdb.Orders, error) {
 	return order, err
 }
 
+// GetMerchantParentOrder fetches a merchant's own top-level order by its
+// order_id. Sub-orders share the merchant's api_key_id and use their own
+// trade_id as order_id, so they are excluded to keep the merchant identity.
+func GetMerchantParentOrder(orderID string, apiKeyID uint64) (*mdb.Orders, error) {
+	order := new(mdb.Orders)
+	err := dao.Mdb.Model(order).
+		Where("order_id = ? AND api_key_id = ?", orderID, apiKeyID).
+		Where("COALESCE(parent_trade_id, '') = ''").
+		Limit(1).
+		Find(order).Error
+	return order, err
+}
+
 // GetOrderInfoByTradeId fetches an order by epusdt trade id.
 func GetOrderInfoByTradeId(tradeId string) (*mdb.Orders, error) {
 	order := new(mdb.Orders)

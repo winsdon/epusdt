@@ -1642,6 +1642,59 @@ definitions:
         example: 3nQ9pL2xV7sK1mR8cT4yB_aZ
         type: string
     type: object
+  response.EPayQueryErrorResponse:
+    properties:
+      code:
+        description: 失败固定为 -1
+        example: -1
+        type: integer
+      msg:
+        description: 失败原因
+        example: authentication failed
+        type: string
+    type: object
+  response.EPayQueryOrderResponse:
+    properties:
+      code:
+        description: 查询成功固定为 1
+        example: 1
+        type: integer
+      money:
+        description: 商户法币订单金额，保留4位小数
+        example: "100.0000"
+        type: string
+      msg:
+        description: 结果说明
+        example: success
+        type: string
+      out_trade_no:
+        description: 商户订单号
+        example: ORD20260416001
+        type: string
+      pid:
+        description: 已认证商户 PID
+        example: "1000"
+        type: string
+      status:
+        description: 1=已支付 0=尚未确认为已支付
+        enum:
+        - 0
+        - 1
+        example: 1
+        type: integer
+      trade_no:
+        description: 平台订单号，与成功回调 trade_no 一致
+        example: 3nQ9pL2xV7sK1mR8cT4yB_aZ
+        type: string
+      trade_status:
+        description: 交易状态
+        enum:
+        - TRADE_SUCCESS
+        - WAIT_BUYER_PAY
+        - TRADE_CLOSED
+        example: TRADE_SUCCESS
+        type: string
+    type: object
   response.EpayPublicConfig:
     properties:
       default_currency:
@@ -4401,6 +4454,93 @@ paths:
           schema:
             $ref: '#/definitions/response.ApiResponse'
       summary: Switch payment network
+      tags:
+      - Payment
+  /payments/epay/v1/order/create-transaction/api.php:
+    get:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: |-
+        EPay/易支付 compatible read-only order query (act=order). Authenticates with pid + key (the merchant secret_key); sign, sign_type, JWT and GMPay HMAC are not used. The merchant IP whitelist applies.
+        Parameters may be sent in the query string, the form body, or both. A parameter that appears with different values (across query and body, or repeated in one source) is rejected.
+        Only the merchant's own top-level orders are visible. money is the merchant fiat order amount with 4 decimals, trade_no equals the success callback trade_no. status=1/trade_status=TRADE_SUCCESS only when the order is paid; unpaid orders still return code=1.
+        Business errors return HTTP 200 with code=-1; service errors return HTTP 503 with code=-1. GET is also accepted.
+      parameters:
+      - description: 'Fixed value: order'
+        in: formData
+        name: act
+        required: true
+        type: string
+      - description: Merchant PID
+        in: formData
+        name: pid
+        required: true
+        type: string
+      - description: Merchant secret_key
+        in: formData
+        name: key
+        required: true
+        type: string
+      - description: Merchant order ID
+        in: formData
+        name: out_trade_no
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.EPayQueryOrderResponse'
+        "503":
+          description: service unavailable
+          schema:
+            $ref: '#/definitions/response.EPayQueryErrorResponse'
+      summary: EPay compatible order query
+      tags:
+      - Payment
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: |-
+        EPay/易支付 compatible read-only order query (act=order). Authenticates with pid + key (the merchant secret_key); sign, sign_type, JWT and GMPay HMAC are not used. The merchant IP whitelist applies.
+        Parameters may be sent in the query string, the form body, or both. A parameter that appears with different values (across query and body, or repeated in one source) is rejected.
+        Only the merchant's own top-level orders are visible. money is the merchant fiat order amount with 4 decimals, trade_no equals the success callback trade_no. status=1/trade_status=TRADE_SUCCESS only when the order is paid; unpaid orders still return code=1.
+        Business errors return HTTP 200 with code=-1; service errors return HTTP 503 with code=-1. GET is also accepted.
+      parameters:
+      - description: 'Fixed value: order'
+        in: formData
+        name: act
+        required: true
+        type: string
+      - description: Merchant PID
+        in: formData
+        name: pid
+        required: true
+        type: string
+      - description: Merchant secret_key
+        in: formData
+        name: key
+        required: true
+        type: string
+      - description: Merchant order ID
+        in: formData
+        name: out_trade_no
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.EPayQueryOrderResponse'
+        "503":
+          description: service unavailable
+          schema:
+            $ref: '#/definitions/response.EPayQueryErrorResponse'
+      summary: EPay compatible order query
       tags:
       - Payment
   /payments/epay/v1/order/create-transaction/submit.php:

@@ -253,6 +253,10 @@ func RegisterRouteWithScanner(e *echo.Echo, connection config.ScannerConnection)
 		return comm.Ctrl.CreateTransactionAndRedirect(ctx)
 	})
 
+	// Read-only EPay order query (act=order) used by merchants such as
+	// Sub2API to confirm a callback. Authenticates with pid + key, not sign.
+	epayV1.Match([]string{http.MethodPost, http.MethodGet}, "/order/create-transaction/api.php", comm.Ctrl.EPayQueryOrder)
+
 	registerAdminRoutes(e, connection)
 }
 

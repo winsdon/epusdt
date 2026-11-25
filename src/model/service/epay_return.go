@@ -23,6 +23,12 @@ func isEPayOrder(order *mdb.Orders) bool {
 	return order != nil && strings.EqualFold(order.PaymentType, mdb.PaymentTypeEpay)
 }
 
+// FormatEPayMoney renders the merchant fiat amount the way EPay callbacks
+// and order queries report it, so both always agree.
+func FormatEPayMoney(amount float64) string {
+	return fmt.Sprintf("%.4f", amount)
+}
+
 func buildCheckoutCounterPath(tradeID string) string {
 	return "/pay/checkout-counter/" + tradeID
 }
@@ -109,8 +115,8 @@ func BuildEPayResultParams(order *mdb.Orders, apiKeyRow *mdb.ApiKey) (map[string
 		OutTradeNo:  order.OrderId,
 		Type:        epayResultType(order),
 		Name:        order.Name,
-		Money:       fmt.Sprintf("%.4f", order.Amount),
-		TradeStatus: "TRADE_SUCCESS",
+		Money:       FormatEPayMoney(order.Amount),
+		TradeStatus: epayTradeSuccess,
 	}
 
 	signstr, err := sign.Get(notifyData, apiKeyRow.SecretKey)

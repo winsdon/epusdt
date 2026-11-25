@@ -188,7 +188,7 @@ func waitForHTTPReady(addr net.Addr) error {
 
 func MiddlewareRegister(e *echo.Echo) {
 	if config.HTTPAccessLog {
-		e.Use(echoMiddleware.Logger())
+		e.Use(middleware.AccessLogger(nil))
 	}
 	e.Use(middleware.RequestUUID())
 }

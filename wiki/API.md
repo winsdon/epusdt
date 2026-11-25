@@ -21,6 +21,7 @@
 | 查询支付状态 | GET | `/pay/check-status/{trade_id}` | 否 |
 | 切换支付网络/通道 | POST | `/pay/switch-network` | 否 |
 | EPay 兼容创建交易 | GET/POST | `/payments/epay/v1/order/create-transaction/submit.php` | 是 |
+| EPay 兼容查单 | GET/POST | `/payments/epay/v1/order/create-transaction/api.php` | 否，使用 `pid` + `key` |
 | 提交交易哈希核验 | POST | `/pay/submit-tx-hash/{trade_id}` | 否，提交 `block_transaction_id` |
 | 收银台返回商户 | GET | `/pay/return/{trade_id}` | 否，返回 HTTP 302 |
 | OkPay 平台回调 | POST | `/payments/okpay/v1/notify` | OkPay 签名 |
@@ -544,6 +545,58 @@ EPay 接口解析 `type/token/network/currency` 的规则：
 - 服务端会在 EPay 签名校验通过后内部注入 `payment_type=Epay`，该字段不参与 EPay 入站签名；但请求里显式传入的 `type/token/network/currency` 仍属于原始 EPay 参数，必须参与签名。
 
 后台默认配置可通过 `/payments/gmpay/v1/config` 的 `epay` 字段查看；新安装默认只预置 `epay.default_currency=cny`，`epay.default_token` 和 `epay.default_network` 为空，因此 EPay 未显式传 token/network 时会创建状态 `4` 占位订单。已有数据库的配置不会被 seed 覆盖，删除或置空 `epay.default_token` 和 `epay.default_network` 后，这两个字段会返回空字符串。
+
+## EPay 兼容查单
+
+`POST /payments/epay/v1/order/create-transaction/api.php`（也接受 GET）
+
+只读的易支付 `act=order` 查单接口，供 Sub2API 等商户在收到成功回调后核实订单状态、金额和交易号。查询不修改订单、不触发回调或补单。
+
+| 参数 | 位置 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `act` | query/form | 是 | 固定为 `order`，其他值返回 `unsupported action` |
+| `pid` | query/form | 是 | 商户 PID |
+| `key` | query/form | 是 | 商户 `secret_key` |
+| `out_trade_no` | query/form | 是 | 商户订单号（创建时的 `out_trade_no`） |
+
+- 使用 `pid + key` 认证，遵循商户 IP 白名单和 `http_trusted_proxies`。不使用 `sign`、`sign_type`、JWT 或 GMPay HMAC。
+- 参数可放在 Query、`application/x-www-form-urlencoded` Body 或两者中。同名参数取值必须一致，Query 与 Body 不一致或同一来源重复且取值不同都会返回 `invalid parameters`。
+- 只能查询当前商户自己的父订单。切换网络产生的子订单号、其他商户订单、无商户归属的旧订单和已删除订单都返回 `order not found`。
+
+成功响应为 HTTP 200，带 `Cache-Control: no-store`，不使用统一的 `status_code/message/data` 包装：
+
+```json
+{
+  "code": 1,
+  "msg": "success",
+  "pid": "1000",
+  "out_trade_no": "ORD202605230001",
+  "trade_no": "20260523171652123456001",
+  "money": "5000.0000",
+  "status": 1,
+  "trade_status": "TRADE_SUCCESS"
+}
+```
+
+`trade_no` 与 EPay 成功回调一致（父订单 `trade_id`）。`money` 是商户法币订单金额，保留 4 位小数，不是链上实付数量。支付状态取商户父订单的结算结果，回调是否成功不影响查询结果。
+
+| 订单状态 | `status` | `trade_status` |
+| --- | --- | --- |
+| `2` 支付成功 | `1` | `TRADE_SUCCESS` |
+| `3` 已过期 | `0` | `TRADE_CLOSED` |
+| `1`、`4`、`5`、`6` 及未知状态 | `0` | `WAIT_BUYER_PAY` |
+
+未支付订单同样返回 `code: 1`。失败时返回 `{"code": -1, "msg": "..."}`，不含任何订单字段：
+
+| `msg` | HTTP | 情况 |
+| --- | --- | --- |
+| `invalid parameters` | 200 | 缺少参数或参数冲突 |
+| `unsupported action` | 200 | `act` 不是 `order` |
+| `authentication failed` | 200 | PID 不存在或已禁用、密钥错误、IP 不在白名单 |
+| `order not found` | 200 | 当前商户范围内订单不存在 |
+| `service unavailable` | 503 | 数据库或服务异常 |
+
+> 请求 URL 中包含商户密钥。开启 `http_access_log` 时，Epusdt 访问日志会把 `key` 的值替换为 `***`。Nginx 等反向代理请自行避免记录该路径的完整 query，例如为该 location 单独设置 `access_log off;`，或使用不含 `$request_uri`/`$args` 的日志格式。
 
 <a id="callbacks"></a>
 

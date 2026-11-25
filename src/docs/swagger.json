@@ -3992,6 +3992,122 @@
                 }
             }
         },
+        "/payments/epay/v1/order/create-transaction/api.php": {
+            "get": {
+                "description": "EPay/易支付 compatible read-only order query (act=order). Authenticates with pid + key (the merchant secret_key); sign, sign_type, JWT and GMPay HMAC are not used. The merchant IP whitelist applies.\nParameters may be sent in the query string, the form body, or both. A parameter that appears with different values (across query and body, or repeated in one source) is rejected.\nOnly the merchant's own top-level orders are visible. money is the merchant fiat order amount with 4 decimals, trade_no equals the success callback trade_no. status=1/trade_status=TRADE_SUCCESS only when the order is paid; unpaid orders still return code=1.\nBusiness errors return HTTP 200 with code=-1; service errors return HTTP 503 with code=-1. GET is also accepted.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "EPay compatible order query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fixed value: order",
+                        "name": "act",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Merchant PID",
+                        "name": "pid",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Merchant secret_key",
+                        "name": "key",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Merchant order ID",
+                        "name": "out_trade_no",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.EPayQueryOrderResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/response.EPayQueryErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "EPay/易支付 compatible read-only order query (act=order). Authenticates with pid + key (the merchant secret_key); sign, sign_type, JWT and GMPay HMAC are not used. The merchant IP whitelist applies.\nParameters may be sent in the query string, the form body, or both. A parameter that appears with different values (across query and body, or repeated in one source) is rejected.\nOnly the merchant's own top-level orders are visible. money is the merchant fiat order amount with 4 decimals, trade_no equals the success callback trade_no. status=1/trade_status=TRADE_SUCCESS only when the order is paid; unpaid orders still return code=1.\nBusiness errors return HTTP 200 with code=-1; service errors return HTTP 503 with code=-1. GET is also accepted.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "EPay compatible order query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fixed value: order",
+                        "name": "act",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Merchant PID",
+                        "name": "pid",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Merchant secret_key",
+                        "name": "key",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Merchant order ID",
+                        "name": "out_trade_no",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.EPayQueryOrderResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/response.EPayQueryErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/payments/epay/v1/order/create-transaction/submit.php": {
             "get": {
                 "description": "Legacy EPAY-style endpoint. Accepts GET (querystring) and POST (form). On success, 302 redirects to /pay/checkout-counter/{trade_id}. Signature uses MD5 of sorted params + secret_key of the api_keys row matching the submitted pid.\nAfter signature verification, type accepts only either alipay or a supported type=token.network selector (for example usdt.tron). Token/network resolution is: supported selector first; otherwise request token/network; otherwise epay.default_token / epay.default_network. If token and network are still both empty, the order is created as status=4 placeholder. Supplying only one of token/network remains invalid.\nCurrency resolution is unchanged: request currency -\u003e epay.default_currency -\u003e cny. Supported type selectors bypass only token/network defaults, not currency fallback.\nSuccess return/notify reuse the stored request type. On this branch that means either alipay or a supported token.network selector; when the request omitted type, outbound fallback remains alipay. The server injects internal payment_type=Epay after EPay signature verification; merchants do not send GMPay payment_type to this endpoint.",
@@ -6656,6 +6772,75 @@
                     "description": "epusdt订单号",
                     "type": "string",
                     "example": "3nQ9pL2xV7sK1mR8cT4yB_aZ"
+                }
+            }
+        },
+        "response.EPayQueryErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "失败固定为 -1",
+                    "type": "integer",
+                    "example": -1
+                },
+                "msg": {
+                    "description": "失败原因",
+                    "type": "string",
+                    "example": "authentication failed"
+                }
+            }
+        },
+        "response.EPayQueryOrderResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "查询成功固定为 1",
+                    "type": "integer",
+                    "example": 1
+                },
+                "money": {
+                    "description": "商户法币订单金额，保留4位小数",
+                    "type": "string",
+                    "example": "100.0000"
+                },
+                "msg": {
+                    "description": "结果说明",
+                    "type": "string",
+                    "example": "success"
+                },
+                "out_trade_no": {
+                    "description": "商户订单号",
+                    "type": "string",
+                    "example": "ORD20260416001"
+                },
+                "pid": {
+                    "description": "已认证商户 PID",
+                    "type": "string",
+                    "example": "1000"
+                },
+                "status": {
+                    "description": "1=已支付 0=尚未确认为已支付",
+                    "type": "integer",
+                    "enum": [
+                        0,
+                        1
+                    ],
+                    "example": 1
+                },
+                "trade_no": {
+                    "description": "平台订单号，与成功回调 trade_no 一致",
+                    "type": "string",
+                    "example": "3nQ9pL2xV7sK1mR8cT4yB_aZ"
+                },
+                "trade_status": {
+                    "description": "交易状态",
+                    "type": "string",
+                    "enum": [
+                        "TRADE_SUCCESS",
+                        "WAIT_BUYER_PAY",
+                        "TRADE_CLOSED"
+                    ],
+                    "example": "TRADE_SUCCESS"
                 }
             }
         },

@@ -19,6 +19,7 @@ Use the public configuration endpoint to discover payment options, create an ord
 | Submit a transfer hash for verification | POST | `/pay/submit-tx-hash/{trade_id}` | Public |
 | Return from checkout | GET | `/pay/return/{trade_id}` | Browser redirect |
 | Create an EPay order | GET or POST | `/payments/epay/v1/order/create-transaction/submit.php` | Merchant MD5 |
+| Query an EPay order | GET or POST | `/payments/epay/v1/order/create-transaction/api.php` | Merchant `pid` + `key` |
 | Receive an OKPay provider notification | POST | `/payments/okpay/v1/notify` | OKPay signature |
 
 ## Response format
@@ -412,6 +413,58 @@ sign=b865b0acbb2b01554c35a1bd33351452
 **Asset selection.** A supported `token.network` selector in `type` overrides explicit token and network fields and their admin defaults. An unknown nonempty type returns `10009` (for example `usdt-tron`). With an empty type or `alipay`, each missing field falls back to its respective EPay default. If both are still empty, the server creates a placeholder. If exactly one is missing after defaults, it rejects the request. Currency uses the request value, then the configured default, then `cny`.
 
 Fresh installations seed `cny` and leave default token and network empty. Existing settings survive upgrades. The server sets `payment_type=Epay` after signature verification. Sign any `type`, `token`, `network` and `currency` you actually send.
+
+## EPay-compatible order query
+
+`POST /payments/epay/v1/order/create-transaction/api.php` (GET is also accepted)
+
+A read-only EPay `act=order` lookup. Merchants such as Sub2API call it after a success callback to confirm the order state, amount, and trade number. The query never changes the order and never triggers callbacks.
+
+| Parameter | Location | Required | Description |
+| --- | --- | --- | --- |
+| `act` | query/form | Yes | Must be `order`. Other values return `unsupported action`. |
+| `pid` | query/form | Yes | Merchant PID |
+| `key` | query/form | Yes | Merchant `secret_key` |
+| `out_trade_no` | query/form | Yes | Merchant order number used at creation |
+
+- Authentication is `pid + key`, subject to the merchant IP whitelist and `http_trusted_proxies`. No `sign`, `sign_type`, JWT, or GMPay HMAC is used.
+- Send parameters in the query string, an `application/x-www-form-urlencoded` body, or both. A parameter with differing values, across query and body or repeated in one source, returns `invalid parameters`.
+- Only the merchant's own parent orders are visible. Sub-order numbers created by a network switch, other merchants' orders, legacy orders without a merchant, and deleted orders return `order not found`.
+
+A successful response is HTTP 200 with `Cache-Control: no-store`. It uses top-level fields, not the `status_code/message/data` envelope:
+
+```json
+{
+  "code": 1,
+  "msg": "success",
+  "pid": "1000",
+  "out_trade_no": "ORD202605230001",
+  "trade_no": "20260523171652123456001",
+  "money": "5000.0000",
+  "status": 1,
+  "trade_status": "TRADE_SUCCESS"
+}
+```
+
+`trade_no` matches the EPay success callback (the parent `trade_id`). `money` is the merchant fiat amount with four decimals, not the on-chain amount. The paid state comes from the parent order settlement; a failed callback does not change it.
+
+| Order status | `status` | `trade_status` |
+| --- | --- | --- |
+| `2` paid | `1` | `TRADE_SUCCESS` |
+| `3` expired | `0` | `TRADE_CLOSED` |
+| `1`, `4`, `5`, `6`, and unknown | `0` | `WAIT_BUYER_PAY` |
+
+Unpaid orders also return `code: 1`. Failures return `{"code": -1, "msg": "..."}` without order fields:
+
+| `msg` | HTTP | Cause |
+| --- | --- | --- |
+| `invalid parameters` | 200 | Missing or conflicting parameters |
+| `unsupported action` | 200 | `act` is not `order` |
+| `authentication failed` | 200 | Unknown or disabled PID, wrong key, or IP not whitelisted |
+| `order not found` | 200 | No such order for this merchant |
+| `service unavailable` | 503 | Database or service failure |
+
+> The request URL carries the merchant key. With `http_access_log` enabled, the Epusdt access log replaces the `key` value with `***`. Configure Nginx or other proxies not to log this path's full query, for example `access_log off;` in a dedicated location or a log format without `$request_uri`/`$args`.
 
 <a id="callbacks"></a>
 
