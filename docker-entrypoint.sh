@@ -115,6 +115,14 @@ if [ "$#" -eq 0 ]; then
   set -- ./epusdt http start
 fi
 
+# Older images used ENTRYPOINT ["./epusdt", "http", "start"], so existing
+# compose files may pass only epusdt flags, e.g. command: ["--config", "..."].
+case "$1" in
+  -*)
+    set -- ./epusdt http start "$@"
+    ;;
+esac
+
 case "$1" in
   chainscanner|*/chainscanner)
     cmd_bin="$1"
